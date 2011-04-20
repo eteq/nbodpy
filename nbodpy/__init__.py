@@ -1,3 +1,3 @@
 from core import *
 
-del np
+del np,abc

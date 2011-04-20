@@ -2,5 +2,6 @@ syntax: glob
 
 build*
 *.c
+*.so
 *.pyc
-
+nbodpy/*html
