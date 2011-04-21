@@ -71,6 +71,51 @@ class Integrator(object):
         """
         raise NotImplementedError
     
+    def getEnergy(self):
+        """
+        Returns the total energy in this system (kinetic+potential)
+        
+        :raises ValueError: 
+            If the potential energy is not well-defined for the given potential.
+        """
+        pe = self.potential.getPE(self.particles)
+        if pe is None:
+            raise ValueError('Potential energy not well-defined for potential %s.'%self.potential)
+        return pe + self.particles.getKE()
+    
+    def getBoundParticles(self,cull=None):
+        """
+        Determines which particles are bound (i.e. have negative total energy).  
+        
+        :param cull:
+            If 'bound', all bound particles will be removed. If 'unbound', all
+            unbound particles will be removed. If False/None, nothing will be
+            done.
+            
+        :raises ValueError: 
+            If the PE is not defined or cull is an invalid value.
+        """
+        boundmsk = self.getEnergy() < 0
+        
+        if cull:
+            if cull=='bound' or  cull=='unbound':
+                if cull=='bound':
+                    cullmsk = ~boundmsk
+                else:
+                    cullmsk = boundmsk
+                
+                ps = self.particles
+                ps._pos = ps._pos[cullmsk]
+                ps._vel = ps._vel[cullmsk]
+                ps._mass = ps._mass[cullmsk]
+                
+                self._orbits = [o[cullmsk] for o in self._orbits]
+                
+            else:
+                raise ValueError('invalid value for `cull`:%s'%cull)
+        
+        return boundmsk
+        
     def plot_orbits(self,xaxis='x',yaxis='y',clf=True,**kwargs):
         """
         Plots a 2D plot of the particles and their orbits.
@@ -117,6 +162,27 @@ class Integrator(object):
         plt.ylabel(yaxis)
         
         return pltres,quiverres
+    
+    def plot_orbits3d(self,xaxis='x',yaxis='y',clf=True,**kwargs):
+        """
+        Plots a 3D plot of the particles and their orbits with mayavi.
+        
+        :param bool clf: If True, clear figure before plotting.
+        
+        kwargs are passed into :func:`enthough.mayavi.mlab.plot3d`.
+        
+        :returns: 
+            the result of :func:`enthough.mayavi.mlab.plot3d` and the result of
+            :func:`enthough.mayavi.mlab.quiver3d`
+        """
+        from enthought import mlab as M
+        
+        if clf:
+            M.clf()
+            
+        raise NotImplementedError
+        
+        return pntres,quiverres
 
     
 class Particles(object):
@@ -230,7 +296,15 @@ class Particles(object):
         """
         return self._mass
 
-
+    def getKE(self):
+        """
+        Returns the kinetic energy of all of the particles in this system.
+        
+        :returns: A length-N array with the kinetic energy of the particles.
+        """
+        vsq = np.sum(self._vel**2,axis=1)
+        return self._mass*vsq/2.
+        
     def plot_particles(self,xaxis='x',yaxis='y',scatter=True,clf=True,**kwargs):
         """
         Plots the particle locations in a 2d projection with matplotlib.
@@ -274,6 +348,27 @@ class Particles(object):
         plt.ylabel(yaxis)
             
         return res
+    
+    def plot_particles3d(self,clf=True,**kwargs):
+        """
+        Plots the particle locations in a 3d projection with mayavi.
+        
+        :param bool clf: If True, clear figure before plotting.
+            
+        kwargs are passed into :func:`enthought.mayavi.mlab.points3d`.
+        
+        :returns: The result of the plotting command
+        """
+        from enthought.mayavi import mlab as M
+        
+        if clf:
+            M.clf()
+            
+        args = list(self._pos.T)
+        args.append(self._mass)
+        kwargs.setdefault('mode','point')
+        
+        return M.points3d(*args,**kwargs)
         
     def plot_velocities(self,xaxis='x',yaxis='y',clf=True,**kwargs):
         """
@@ -312,7 +407,25 @@ class Particles(object):
         plt.ylabel(yaxis)
         return plt.quiver(x,y,vx,vy,**kwargs)
     
-    
+    def plot_velocities3d(self,clf=True,**kwargs):
+        """
+        Plots the particle velocities in a 3d projection with mayavi.
+        
+        :param bool clf: If True, clear figure before plotting.
+            
+        kwargs are passed into :func:`enthought.mayavi.mlab.quiver3d`.
+        
+        :returns: The result of the plotting command
+        """
+        from enthought.mayavi import mlab as M
+        
+        if clf:
+            M.clf()
+            
+        args = list(self._pos.T)
+        args.extend(list(self._vel.T))
+        
+        return M.quiver3d(*args,**kwargs)
         
 class Potential(object):
     """
@@ -332,6 +445,16 @@ class Potential(object):
         """
         raise NotImplementedError
     
+    @abc.abstractmethod
+    def getPE(self,particles):
+        """
+        This method should be overridden to compute the potential energy at each
+        of the provided particles. It should return None if potential energy is
+        undefined for that "potential."
+        
+        :returns: length-N array with the total potential energy of None.
+        """
+        raise NotImplementedError
     
 #<-------------------------Implementations------------------------------------->
 
@@ -368,10 +491,17 @@ class PointPotential(Potential):
         self.position = np.array(position)
         
     def forces(self,particles):
-        posoff = particles.pos - self.position
+        posoff = self.position - particles.position
+        rsq = np.sum(posoff**2,axis=1).reshape((posoff.shape[0],1))
+        
+        return posoff*self.mass*rsq**-1.5
+    
+    def getPE(self,particles):
+        posoff = self.position - particles.position
         rsq = np.sum(posoff**2,axis=1)
         
-        return self.mass*posoff-rsq**-1.5
+        return -self.mass*particles.mass*rsq**-.5
+        
     
 class NullPotential(Potential):
     """
@@ -379,6 +509,9 @@ class NullPotential(Potential):
     """
     def forces(self,particles):
         return np.zeros((particles.n,3))
+    
+    def getPE(self,particles):
+        return np.zeros_like(particles._mass)
     
 class CompositePotential(Potential):
     """
@@ -390,6 +523,15 @@ class CompositePotential(Potential):
         
     def forces(self,particles):
         return np.sum([p.forces(particles) for p in self.potentials],axis=0)
+    
+    def getPE(self,particles):
+        pes = [p.getPE(particles) for p in self.potentials]
+        if any([p is None for p in pes]):
+            invalid = True
+            #pes = [p for p in pes if p is not None]
+            return None
+        else:
+            np.sum(pes,axis=0)
     
 #<-------------------------IC Generators--------------------------------------->
 
