@@ -174,14 +174,23 @@ class Integrator(object):
             the result of :func:`enthough.mayavi.mlab.plot3d` and the result of
             :func:`enthough.mayavi.mlab.quiver3d`
         """
-        from enthought import mlab as M
+        from enthought.mayavi import mlab as M
         
         if clf:
             M.clf()
             
-        raise NotImplementedError
+        orbarr = self.getOrbits()[1].transpose((1,2,0))
+        t = self._orbt
         
-        return pntres,quiverres
+        pntress = []
+        for o in orbarr:
+            pntress.append(M.plot3d(o[0],o[1],o[2],t,**kwargs))
+        
+        xp,yp,zp = self.particles.position.T
+        vx,vy,vz = self.particles.velocity.T
+        quiverres = M.quiver3d(xp,yp,zp,vx,vy,vz)
+        
+        return pntress,quiverres
 
     
 class Particles(object):
@@ -234,7 +243,7 @@ class Particles(object):
                 
         elif len(args)==6 or len(args)==7:
             pos = np.transpose([args[0],args[1],args[2]])
-            vel = np.transpose([args[4],args[5],args[6]])
+            vel = np.transpose([args[3],args[4],args[5]])
             if len(args)==7:
                 mass = args[6].copy()
             else:

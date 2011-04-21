@@ -53,7 +53,7 @@ def uniform_normal_ics(nparticles,pscale=1,vscale=1,masses=None):
         return Particles(pos,vel,masses)
     
 def keplerian_ics(nparticles,zscale=0,vzscatter=0,radialprof='exponential',
-                             zprofile='gaussian',centermass=1):
+                             zprof='gaussian',centermass=1):
     """
     Sets up initial conditions corresponding to Keplerian rotation about the origin.
     
@@ -62,7 +62,7 @@ def keplerian_ics(nparticles,zscale=0,vzscatter=0,radialprof='exponential',
     :param radialprof: 
         Can be 'exponential','gaussian','power#.#','ring', or 'uniform'. All are 
         scaled to 1. (#.# in power gives power law index)
-    :param zprofile: 
+    :param zprof: 
         Can be 'gaussian','exponential','sechsq','power#.#'
     :param centermass: mass of central point-potential
     
@@ -73,7 +73,7 @@ def keplerian_ics(nparticles,zscale=0,vzscatter=0,radialprof='exponential',
     from core import Particles,PointPotential
     
     if radialprof == 'exponential':
-        r = -log(1-np.random.rand(nparticles))
+        r = -np.log(1-np.random.rand(nparticles))
     elif radialprof == 'gaussian':
         r = np.random.randn(nparticles)
     elif radialprof == 'ring':
@@ -91,26 +91,27 @@ def keplerian_ics(nparticles,zscale=0,vzscatter=0,radialprof='exponential',
     x = r*np.cos(phi)
     y = r*np.sin(phi)
     
-    if radialprof == 'exponential':
-        z = -log(1-np.random.rand(nparticles))
-    elif radialprof == 'gaussian':
+    if zprof == 'exponential':
+        z = -np.log(1-np.random.rand(nparticles))
+    elif zprof == 'gaussian':
         z = np.random.randn(nparticles)
-    elif radialprof == 'sechsq':
+    elif zprof == 'sechsq':
         z = np.arctanh(np.random.rand(nparticles))
-    elif radialprof.startswith('power'):
+    elif zprof.startswith('power'):
         alpha = float(radialprof[5:])
         z = ((1-alpha)*np.random.rand(nparticles))**(1/(1-alpha))
     else:
         raise ValueError('Invalid z profile')
     z *= zscale
     
-    vz = vzscale*np.random.randn(nparticles)
+    vz = vzscatter*np.random.randn(nparticles)
     
     vcirc = (centermass/r)**0.5 
     vxy = vcirc - vz
     
-    vx = y*vxy
-    vy = -x*vxy
+    s = np.hypot(x,y)
+    vx = y*vxy/s
+    vy = -x*vxy/s
     
     ps = Particles(x,y,z,vx,vy,vz)
     pot = PointPotential(centermass)
