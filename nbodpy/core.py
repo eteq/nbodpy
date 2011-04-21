@@ -1,7 +1,6 @@
 from __future__ import division
 
 import numpy as np
-#np.seterr(invalid='ignore',divide='ignore')
 import abc
 
 #<----------------------------Base classes------------------------------------->
@@ -532,44 +531,3 @@ class CompositePotential(Potential):
             return None
         else:
             np.sum(pes,axis=0)
-    
-#<-------------------------IC Generators--------------------------------------->
-
-def normal_ics(nparticles,pscale=1,vscale=1,masses=None):
-    """
-    Generates `nparticles` particles with normally distributed locations and
-    speeds.
-    """
-    pos = pscale*np.randn(3,nparticles)
-    vel = vscale*np.randn(3,nparticles)
-    
-    if masses is None:
-        return Particles(pos,vel)
-    else:
-        return Particles(pos,vel,masses)
-    
-def uniform_ics(nparticles,pscale=1,vscale=1,masses=None):
-    """
-    Generates `nparticles` particles with uniformly distributed locations
-    (centered at the origin with box size `pscale`) and uniform velocities.
-    """
-    pos = pscale*(np.rand(3,nparticles)-.5)
-    vel = vscale*(np.rand(3,nparticles)-.5)
-    
-    if masses is None:
-        return Particles(pos,vel)
-    else:
-        return Particles(pos,vel,masses)
-    
-def uniform_normal_ics(nparticles,pscale=1,vscale=1,masses=None):
-    """
-    Generates `nparticles` particles with uniformly distributed locations
-    (centered at the origin with box size `pscale`) and gaussian velocities.
-    """
-    pos = pscale*(np.rand(3,nparticles)-.5)
-    vel = vscale*np.randn(3,nparticles)
-    
-    if masses is None:
-        return Particles(pos,vel)
-    else:
-        return Particles(pos,vel,masses)
