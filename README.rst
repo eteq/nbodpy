@@ -1,7 +1,8 @@
 Nbodypy
 =======
 
-`Nbodpy` is a simple Nbody simulation tool using python and Cython
+`Nbodpy` is a simple direct N-body gravity simulation tool using python and Cython.  
+It probably isn't suitable for actual science work, but may be useful for education or illustrative purposes.
 
 Requirements
 ------------
